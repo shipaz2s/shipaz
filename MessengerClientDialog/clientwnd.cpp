@@ -9,15 +9,23 @@ ClientWnd::ClientWnd(const QString& strHost, int nPort, QWidget *parent):
     connect(this, SIGNAL(showSysMsg()), SLOT(slotShowSysMsg()) );
     connect(ui->action_Connect, SIGNAL( triggered() ), this, SLOT( slotReconnect() ) );
     connect(ui->action_Login, SIGNAL(triggered()), this, SLOT(login()));
+    connect(ui->sendButton, SIGNAL(clicked), this, SLOT(sendButtonClicked()));
 
     slotShowSysMsg();
     setFriendModel();
 
     connect(ui->listWidget, SIGNAL(itemClicked(QListWidgetItem*)), this, SLOT(selectContact(QListWidgetItem*)));
+
+    pClientServerThread = new QThread();
+    //p
 }
 
 ClientWnd::~ClientWnd(){
     delete ui;
+    delete pClientServer;
+    pClientServerThread->quit();
+    pClientServerThread->wait();
+    delete pClientServerThread;
 }
 
 
@@ -45,8 +53,16 @@ void ClientWnd::slotShowSysMsg(){
     if (msg.length()>1){
         switch (msg[1].toInt()) {
         case 1:
-            if (msg[2] == '1')
+            if (msg[2] != '0'){
                 sysMsg = "Login succeeded.";
+                pClientServer = new ClientServer(msg[2].toInt());
+                pClientServer->moveToThread(pClientServerThread);
+                connect(this, SIGNAL(sendMsg(const QString &, const QString &)),
+                        pClientServer, SLOT(sendMsg(const QString &, const QString &)) );
+                connect(pClientServer, SIGNAL(readMsg(int, const QString &)),
+                        this, SLOT(readMsg(int, const QString &)));
+                pClientServerThread->start();
+            }
             else
                 sysMsg = "Login unsucceeded!";
             slotShowSysMsg();
@@ -55,10 +71,12 @@ void ClientWnd::slotShowSysMsg(){
             if (msg[3] == "NULL"){
                 ui->listWidget->currentItem()->setBackground(Qt::white);
                 ui->listWidget->currentItem()->setForeground(Qt::black);
+                contactIp = "NULL";
             }
             else{
                 ui->listWidget->currentItem()->setBackground(Qt::darkGreen);
                 ui->listWidget->currentItem()->setForeground(Qt::white);
+                contactIp = msg[3];
             }
             break;
         default:
@@ -101,4 +119,23 @@ void ClientWnd::selectContact(QListWidgetItem* item){
     QString contactName = item->data(Qt::DisplayRole).toString();
     QString id = friendLst.key(contactName);
     checkUserStatus(id);
+}
+
+void ClientWnd::sendButtonClicked(){
+    QString msg = ui->msgEdit->toPlainText();
+    ui->msgEdit->clear();
+    ui->chatEdit->append("\n" + msg);
+    emit sendMsg(contactIp, msg);
+}
+
+void ClientWnd::keyPressEvent(QKeyEvent *event){
+    if ( (event->key() == Qt::Key_Return) and ui->msgEdit->hasFocus()){
+        sendButtonClicked();
+    }
+    else
+        QWidget::keyPressEvent(event);
+}
+
+void ClientWnd::readMsg(int id, const QString &str){
+    ui->chatEdit->append(QString::number(id) + " " + str);
 }

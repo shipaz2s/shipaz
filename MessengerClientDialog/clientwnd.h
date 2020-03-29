@@ -3,7 +3,6 @@
 
 #include <QObject>
 #include <QMainWindow>
-#include "mesclient.h"
 #include <QLabel>
 #include <QLineEdit>
 #include <QDialog>
@@ -11,6 +10,11 @@
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QBrush>
+#include <QThread>
+#include <QKeyEvent>
+
+#include "mesclient.h"
+#include "clientserver.h"
 
 
 namespace Ui {
@@ -32,15 +36,25 @@ private:
     QLineEdit* loginLE;
     QLineEdit* passwordLE;
 
+    QString contactIp;
+
+    ClientServer * pClientServer;
+    QThread * pClientServerThread;
+
+    void keyPressEvent(QKeyEvent *event);
     void setFriendModel();
     void checkUserStatus(const QString&);//true = online
 
+signals:
+    void sendMsg(const QString &ip, const QString &msg);
 
 private slots:
     void slotShowSysMsg();
     void login();
     void enterLogData();
     void selectContact(QListWidgetItem*);
+    void sendButtonClicked();
+    void readMsg(int id, const QString&);
 };
 
 #endif // CLIENTWND_H
